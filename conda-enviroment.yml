@@ -1,0 +1,15 @@
+# conda env create -f conda-enviroment.yml
+# conda env update --file conda-enviroment.yml --prune
+
+name: lab-langgraph
+channels:
+    - defaults
+    - anaconda
+    - conda-forge
+dependencies:
+    - python=3.12
+    - openjdk
+    - git
+    - pip
+    - pip:
+        - -r requirements.txt
