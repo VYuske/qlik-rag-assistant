@@ -16,4 +16,6 @@ ollama
 langchain-chroma>=0.1.2
   
 # Aider
-aider-chat
+aider-chat```
+
+path/to/conda-enviroment.yml
