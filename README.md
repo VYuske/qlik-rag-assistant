@@ -2,7 +2,7 @@
 
 Assistente de RAG (Retrieval-Augmented Generation) **local** sobre a documentação em PDF do Qlik.
 
-O pipeline transforma PDFs em markdown, divide em chunks, gera embeddings com Ollama e persiste em ChromaDB. A recuperação por similaridade já funciona; a camada de geração (LLM/chat) é a próxima fase.
+O pipeline transforma PDFs em markdown, divide em chunks, gera embeddings com Ollama e persiste em ChromaDB. Sobre a recuperação há um grafo LangGraph com loop de avaliação e uma interface de chat em Streamlit.
 
 ## Requisitos
 
@@ -27,20 +27,44 @@ cp .env.example .env
 
 ## Uso
 
+### Chat no navegador
+
+```bash
+streamlit run src/qlik_rag/ui/app.py
+```
+
+Abre em `http://localhost:8501`. A resposta aparece em streaming, com as fontes em um expander, e a sidebar mostra a contagem de chunks e o botão de reindexação.
+
+### Linha de comando
+
 ```bash
 qlik-rag stats
 qlik-rag ingest
 qlik-rag ingest --force
 qlik-rag query "create bookmark" -k 5
+qlik-rag ask "how do I create a bookmark?"
 ```
 
 Ou, sem instalar o entrypoint:
 
 ```bash
-python -m qlik_rag.cli.main query "create bookmark"
+python -m qlik_rag.cli.main ask "how do I create a bookmark?"
 ```
 
 Coloque os PDFs de origem em `data/raw/qlik/`. Todos os `.pdf` do diretório são indexados.
+
+### Como a resposta é montada
+
+O grafo (`src/qlik_rag/generation/graph.py`) executa:
+
+```
+retrieve -> grade -> (suficiente ou limite atingido?) -> generate
+                  \-> (insuficiente) -> reformulate -> retrieve
+```
+
+- `MAX_RETRIEVAL_LOOPS` (default `1`) limita quantas vezes a pergunta pode ser reformulada.
+- Se a avaliação falhar, o grafo segue direto para a resposta em vez de quebrar.
+- Quando a documentação não cobre a pergunta, a resposta é a frase de recusa definida em `config/prompts.py`.
 
 ## Docker
 
@@ -52,22 +76,22 @@ O container roda o app e precisa alcançar o Ollama que roda no host.
 OLLAMA_HOST=0.0.0.0 ollama serve
 cp .env.example .env
 docker compose build
-docker compose run --rm app query "create bookmark"
+docker compose up ui
 ```
 
 **Linux** — o Ollama costuma escutar apenas em `127.0.0.1`; use o override que roda o container na mesma rede do host:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.linux.yml build
-docker compose -f docker-compose.yml -f docker-compose.linux.yml run --rm app stats
+docker compose -f docker-compose.yml -f docker-compose.linux.yml up ui
 ```
 
-Comandos disponíveis dentro do container:
+A interface fica em `http://localhost:8501`. Para os comandos de CLI no container:
 
 ```bash
 docker compose run --rm app stats
 docker compose run --rm app ingest --force
-docker compose run --rm app query "create bookmark"
+docker compose run --rm app ask "how do I create a bookmark?"
 ```
 
 O índice fica em `./data/vectorstore/chroma`, montado como volume.
@@ -78,10 +102,12 @@ O índice fica em `./data/vectorstore/chroma`, montado como volume.
 
 ```
 src/qlik_rag/
-├── config/        settings e prompts
+├── config/        settings, prompts
 ├── ingestion/     loader de PDF, splitters e ingestor
 ├── retrieval/     acesso ao vector store
-├── services/      orquestração de ingestão e busca
+├── generation/    modelo de chat, estado e grafo RAG
+├── services/      ingestão, busca e chat
+├── ui/            app Streamlit e formatação
 ├── cli/           entrypoint argparse
 └── logging_setup.py
 ```
@@ -95,4 +121,4 @@ pytest -q
 ruff check src tests
 ```
 
-Os testes usam `FakeEmbeddings` e `tmp_path`, portanto não exigem rede nem Ollama.
+Os testes usam `FakeEmbeddings`, LLM falso e `tmp_path`, portanto não exigem rede nem Ollama.

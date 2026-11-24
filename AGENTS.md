@@ -18,14 +18,16 @@ PDF (data/raw/qlik)
   -> OllamaEmbeddings (modelo local)
   -> ChromaDB (persistência em data/vectorstore/chroma)
   -> retriever (busca por similaridade)
+  -> grafo LangGraph (retrieve -> grade -> reformulate* -> generate)
+  -> chat (Streamlit ou CLI)
 ```
 
 Estado atual:
 
-- **Existe**: configuração, ingestão, embeddings, vector store, recuperação e CLI.
-- **Não existe ainda**: camada de geração (LLM/chat) e orquestração com LangGraph. O `SYSTEM_PROMPT` em `src/qlik_rag/config/prompts.py` está reservado para essa fase.
+- **Existe**: configuração, ingestão, embeddings, vector store, recuperação, grafo de geração com loop de avaliação, CLI (`stats`, `ingest`, `query`, `ask`) e UI Streamlit com streaming e fontes.
+- **Não existe ainda**: memória de conversa persistente entre sessões (hoje o histórico vive no `st.session_state`) e avaliação automatizada da qualidade das respostas.
 
-Stack: Python 3.12, LangChain, Ollama (local), ChromaDB, `pydantic-settings`, `pytest`, `ruff`, Docker.
+Stack: Python 3.12, LangChain, LangGraph, Ollama (local), ChromaDB, Streamlit, `pydantic-settings`, `pytest`, `ruff`, Docker.
 
 Tudo roda **offline**. Modelos são servidos pelo Ollama no host (`http://localhost:11434` fora do container, `http://host.docker.internal:11434` dentro).
 
@@ -35,10 +37,12 @@ Tudo roda **offline**. Modelos são servidos pelo Ollama no host (`http://localh
 
 ```
 src/qlik_rag/
-├── config/        settings.py (Settings), prompts.py (SYSTEM_PROMPT)
+├── config/        settings.py (Settings), prompts.py (SYSTEM_PROMPT e prompts do grafo)
 ├── ingestion/     loaders.py, splitters.py, ingestor.py
 ├── retrieval/     vector_store.py (VectorStoreService)
-├── services/      ingestion_service.py, search_service.py
+├── generation/    llm.py, state.py, graph.py (grafo RAG)
+├── services/      ingestion_service.py, search_service.py, chat_service.py
+├── ui/            app.py (Streamlit), formatting.py
 ├── cli/           main.py (entrypoint argparse)
 └── logging_setup.py
 ```
@@ -46,13 +50,15 @@ src/qlik_rag/
 Regra de dependência **unidirecional**:
 
 ```
-cli -> services -> {ingestion, retrieval} -> config
+ui -> services -> {generation, ingestion, retrieval} -> config
+cli -> services -> ...
 ```
 
 - `config` não importa nada do projeto (folha da árvore).
-- `ingestion` e `retrieval` não conhecem `services` nem `cli`.
-- `services` orquestra domínio; `cli` apenas traduz argumentos para chamadas de serviço.
-- Nada fora de `cli` chama `sys.exit`, faz parsing de argumentos ou imprime em stdout.
+- `ingestion` e `retrieval` não conhecem `services` nem `ui`.
+- `generation` recebe o retriever e o LLM por injeção; não instancia Chroma.
+- `services` orquestra domínio; `cli` e `ui` apenas traduzem entrada para chamadas de serviço.
+- `ui/` e `cli/` são as únicas camadas que escrevem em stdout/tela. Nada fora delas chama `sys.exit`, faz parsing de argumentos ou imprime.
 
 Ao adicionar um módulo, escolha a camada pela dependência, não pela conveniência do import. Se a regra precisar mudar, atualize este arquivo no mesmo commit.
 
@@ -228,9 +234,16 @@ qlik-rag stats
 qlik-rag ingest
 qlik-rag ingest --force
 qlik-rag query "create bookmark" -k 5
+qlik-rag ask "how do I create a bookmark?"
 ```
 
 Equivalente sem instalação: `python -m qlik_rag.cli.main <comando>`.
+
+### Chat
+
+```bash
+streamlit run src/qlik_rag/ui/app.py
+```
 
 ### Docker
 
