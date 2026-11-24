@@ -34,10 +34,14 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     embedding_model: str = "qwen3-embedding:0.6b"
     llm_model: str = "qwen3.5:4b"
+    llm_temperature: float = 0.0
+    llm_num_ctx: int = 8192
 
     chunk_size: int = 1000
     chunk_overlap: int = 150
     retrieval_k: int = 5
+    max_retrieval_loops: int = 1
+    streamlit_port: int = 8501
 
     headers_to_split_on: list[tuple[str, str]] = DEFAULT_HEADERS_TO_SPLIT_ON
 
