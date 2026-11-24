@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      DATA_RAW_DIR: /app/data/raw/qlik
+      CHROMA_PERSIST_DIR: /app/data/vectorstore/chroma
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/app/data
