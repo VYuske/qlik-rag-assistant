@@ -1,4 +1,4 @@
-"""Entrypoint de linha de comando: `stats`, `ingest` e `query`."""
+"""Entrypoint de linha de comando: `stats`, `ingest`, `query` e `ask`."""
 
 from __future__ import annotations
 
@@ -9,11 +9,14 @@ import sys
 from collections.abc import Sequence
 
 from qlik_rag.config.settings import Settings
+from qlik_rag.generation.graph import build_rag_graph
+from qlik_rag.generation.llm import build_chat_model
 from qlik_rag.ingestion.ingestor import MarkdownIngestor
 from qlik_rag.ingestion.loaders import build_pdf_loader
 from qlik_rag.ingestion.splitters import build_chunk_splitter, build_header_splitter
 from qlik_rag.logging_setup import configure_logging
 from qlik_rag.retrieval.vector_store import VectorStoreService
+from qlik_rag.services.chat_service import ChatService
 from qlik_rag.services.ingestion_service import IngestionService
 from qlik_rag.services.search_service import SearchService
 
@@ -50,6 +53,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Quantidade de chunks retornados (padrão: RETRIEVAL_K).",
     )
+
+    ask_parser = subparsers.add_parser("ask", help="Responde uma pergunta com streaming.")
+    ask_parser.add_argument("text", help="Pergunta em linguagem natural.")
 
     return parser
 
@@ -97,6 +103,35 @@ def _run_query(settings: Settings, text: str, k: int | None) -> int:
     return 0
 
 
+def build_chat_service(settings: Settings) -> ChatService:
+    """Monta o serviço de chat ligado ao índice e ao modelo configurados."""
+    search = SearchService(VectorStoreService(settings))
+    graph = build_rag_graph(
+        settings=settings,
+        retrieve=lambda question: search.search(question),
+        llm=build_chat_model(settings),
+    )
+    return ChatService(graph=graph)
+
+
+def _run_ask(settings: Settings, text: str) -> int:
+    sources: list = []
+    for event in build_chat_service(settings).stream_answer(text):
+        if event.kind == "sources":
+            sources = event.documents
+        elif event.kind == "token":
+            print(event.text, end="", flush=True)
+    print()
+    if sources:
+        print("\nFontes:")
+        for document in sources:
+            source = document.metadata.get("source", "desconhecido")
+            page = document.metadata.get("page")
+            location = f"{source}, pág. {page}" if page is not None else source
+            print(f"- {location}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Ponto de entrada da CLI; retorna o código de saída do processo."""
     args = _build_parser().parse_args(argv)
@@ -107,6 +142,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_stats(settings)
     if args.command == "ingest":
         return _run_ingest(settings, force=args.force)
+    if args.command == "ask":
+        return _run_ask(settings, text=args.text)
     return _run_query(settings, text=args.text, k=args.k)
 
 

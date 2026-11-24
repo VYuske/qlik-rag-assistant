@@ -8,6 +8,7 @@ import pytest
 from langchain_core.documents import Document
 
 from qlik_rag.cli import main as cli_main
+from qlik_rag.services.chat_service import ChatEvent
 from qlik_rag.services.ingestion_service import IngestionReport
 
 
@@ -39,6 +40,26 @@ def patched_cli(monkeypatch):
     monkeypatch.setattr(cli_main, "SearchService", StubSearch)
     monkeypatch.setattr(cli_main, "IngestionService", StubIngestion)
     monkeypatch.setattr(cli_main, "_build_ingestor", lambda settings: object())
+
+
+def test_ask_streams_tokens_and_sources(patched_cli, monkeypatch, capsys) -> None:
+    class StubChatService:
+        def stream_answer(self, question, history=None):
+            yield ChatEvent(kind="sources", documents=[
+                Document(page_content="x", metadata={"source": "a.pdf", "page": 2})
+            ])
+            yield ChatEvent(kind="token", text="Hello ")
+            yield ChatEvent(kind="token", text="world")
+            yield ChatEvent(kind="done", text="Hello world")
+
+    monkeypatch.setattr(cli_main, "build_chat_service", lambda settings: StubChatService())
+
+    exit_code = cli_main.main(["ask", "how?"])
+
+    captured = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Hello world" in captured
+    assert "a.pdf" in captured
 
 
 def test_stats_prints_chunk_count(patched_cli, capsys) -> None:
