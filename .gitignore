@@ -209,3 +209,9 @@ __marimo__/
 # AIDER
 .aider*
 aider-files/
+
+# Índice vetorial (artefato regenerável)
+data/vectorstore/
+
+# Agentes / ferramentas locais
+.commandcode/
