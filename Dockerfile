@@ -15,5 +15,7 @@ COPY src ./src
 
 RUN pip install --no-cache-dir .
 
+EXPOSE 8501
+
 ENTRYPOINT ["qlik-rag"]
 CMD ["stats"]
