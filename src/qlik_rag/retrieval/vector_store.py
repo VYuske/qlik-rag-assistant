@@ -36,17 +36,15 @@ class VectorStoreService:
             persist_directory=str(self._settings.chroma_persist_dir),
         )
 
-    @property
-    def store(self) -> Chroma:
-        """Instância Chroma subjacente."""
-        return self._store
-
     def count(self) -> int:
         """Número de chunks indexados na collection."""
         return self._store._collection.count()
 
     def add_documents(self, documents: list[Document]) -> list[str]:
         """Indexa os documentos e retorna os identificadores gerados."""
+        if not documents:
+            logger.info("Nenhum chunk para indexar; nada foi alterado.")
+            return []
         ids = self._store.add_documents(documents)
         logger.info("Indexados %d chunks em '%s'.", len(ids), self._settings.collection_name)
         return ids
@@ -60,5 +58,5 @@ class VectorStoreService:
         """Retorna um retriever por similaridade com `k` resultados."""
         return self._store.as_retriever(
             search_type="similarity",
-            search_kwargs={"k": k or self._settings.retrieval_k},
+            search_kwargs={"k": self._settings.retrieval_k if k is None else k},
         )

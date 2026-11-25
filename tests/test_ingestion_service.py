@@ -56,3 +56,12 @@ def test_force_reindexes_existing_content(settings: Settings) -> None:
 
     assert report.skipped is False
     assert ingestor.calls == 2
+
+
+def test_empty_ingestion_does_not_crash(settings: Settings) -> None:
+    service, _ = build_service(settings, [])
+
+    report = service.ensure_indexed()
+
+    assert report.indexed_chunks == 0
+    assert report.skipped is False

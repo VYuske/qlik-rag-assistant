@@ -39,6 +39,22 @@ def test_reset_empties_the_collection(settings: Settings) -> None:
     assert service.count() == 0
 
 
+def test_add_documents_with_empty_list_is_a_noop(settings: Settings) -> None:
+    service = build_service(settings)
+
+    assert service.add_documents([]) == []
+    assert service.count() == 0
+
+
+def test_add_documents_with_empty_list_keeps_existing_content(settings: Settings) -> None:
+    service = build_service(settings)
+    service.add_documents([Document(page_content="anything", metadata={})])
+
+    service.add_documents([])
+
+    assert service.count() == 1
+
+
 def test_retriever_respects_k(settings: Settings) -> None:
     service = build_service(settings)
     service.add_documents(
