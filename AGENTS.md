@@ -87,6 +87,7 @@ Se você sente necessidade de comentar um trecho, prefira: extrair uma função 
 - `logging` (via `logging.getLogger(__name__)`) em vez de `print`. Diagnóstico de CLI pode usar stdout em `cli/`.
 - Nomenclatura: módulos e funções `snake_case`, classes `PascalCase`, constantes `UPPER_SNAKE`, campos de `Settings` em `snake_case`.
 - `ruff` deve passar sem erros; não use `# noqa` sem justificativa na mesma linha.
+- `ruff format --check src tests` deve passar: o CI verifica formatação, então rode `ruff format src tests` antes de commitar.
 
 ### 3.3 Configuração
 
@@ -117,6 +118,7 @@ Comandos:
 ```bash
 pytest -q
 ruff check src tests
+ruff format --check src tests
 ```
 
 ---
@@ -202,7 +204,8 @@ Ao **receber** um handoff:
 Uma tarefa só está concluída quando:
 
 - [ ] Existe teste cobrindo o comportamento novo/corrigido, e ele passa.
-- [ ] `pytest -q` e `ruff check src tests` passam.
+- [ ] `pytest -q`, `ruff check src tests` e `ruff format --check src tests` passam.
+- [ ] O workflow de CI (`.github/workflows/ci.yml`) passaria com a mudança.
 - [ ] Não há comentários soltos, código comentado, imports não usados ou arquivos mortos.
 - [ ] Configuração nova está em `Settings` e no `.env.example`.
 - [ ] `AGENTS.md`/`README.md` atualizados se o contrato ou o modo de uso mudou.
@@ -225,6 +228,7 @@ pip install -e ".[dev]"
 ```bash
 pytest -q
 ruff check src tests
+ruff format --check src tests
 ```
 
 ### CLI
