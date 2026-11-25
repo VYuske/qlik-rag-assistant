@@ -7,10 +7,11 @@ from collections.abc import Callable
 
 from langchain_core.documents import Document
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from qlik_rag.config.prompts import (
     GRADE_PROMPT,
@@ -40,18 +41,19 @@ def format_context(documents: list[Document]) -> str:
     return "\n\n".join(blocks)
 
 
-def is_affirmative(answer: str) -> bool:
-    """Interpreta a resposta do avaliador como suficiente ou não."""
-    normalized = answer.strip().lower().rstrip(".!")
-    return normalized in AFFIRMATIVE_ANSWERS
+def _first_word(text: str) -> str:
+    """Extrai a primeira palavra significativa, ignorando pontuação e markdown."""
+    cleaned = text.strip().lower().lstrip("*-• ")
+    token = cleaned.split()[0] if cleaned.split() else ""
+    return token.strip("\"'.,:;!?*_`")
 
 
 def build_rag_graph(
     settings: Settings,
     retrieve: RetrieveFn,
     llm: BaseChatModel,
-) -> object:
-    """Monta e compila o grafo: retrieve -> grade -> (reformulate -> retrieve)* -> generate."""
+) -> CompiledStateGraph:
+    """Monta o grafo: retrieve -> grade -> (reformulate -> retrieve)* -> generate."""
     answer_chain = (
         ChatPromptTemplate.from_messages(
             [
@@ -66,10 +68,9 @@ def build_rag_graph(
     reformulate_chain = ChatPromptTemplate.from_template(REFORMULATE_PROMPT) | llm
 
     def retrieve_node(state: RAGState) -> dict[str, object]:
-        question = state["question"]
-        documents = retrieve(question)
-        writer = get_stream_writer()
-        writer({"type": "sources", "documents": documents})
+        query = state["search_query"]
+        documents = retrieve(query)
+        get_stream_writer()({"type": "sources", "documents": documents})
         return {"documents": documents, "attempts": state.get("attempts", 0) + 1}
 
     def grade_node(state: RAGState) -> dict[str, object]:
@@ -83,16 +84,16 @@ def build_rag_graph(
         except Exception:
             logger.warning("Avaliação falhou; seguindo direto para a resposta.", exc_info=True)
             return {"sufficient": True}
-        return {"sufficient": is_affirmative(str(raw.content))}
+        return {"sufficient": _first_word(str(raw.content)) in AFFIRMATIVE_ANSWERS}
 
     def reformulate_node(state: RAGState) -> dict[str, object]:
         try:
             raw = reformulate_chain.invoke({"question": state["question"]})
-            new_question = str(raw.content).strip() or state["question"]
+            candidate = str(raw.content).strip()
         except Exception:
-            logger.warning("Reformulação falhou; mantendo a pergunta original.", exc_info=True)
-            new_question = state["question"]
-        return {"question": new_question}
+            logger.warning("Reformulação falhou; mantendo a busca atual.", exc_info=True)
+            candidate = ""
+        return {"search_query": candidate or state["search_query"]}
 
     def generate_node(state: RAGState) -> dict[str, object]:
         messages = [
@@ -110,10 +111,16 @@ def build_rag_graph(
         return {"messages": [AIMessage(content=str(response.content))]}
 
     def route_after_grade(state: RAGState) -> str:
-        attempts = state.get("attempts", 0)
-        if state.get("sufficient") or attempts > settings.max_retrieval_loops:
+        if state.get("sufficient"):
+            return "generate"
+        if state.get("attempts", 0) > settings.max_retrieval_loops:
             return "generate"
         return "reformulate"
+
+    def route_after_reformulate(state: RAGState) -> str:
+        if state["search_query"] == state.get("question") or not state["search_query"].strip():
+            return "generate"
+        return "retrieve"
 
     graph = StateGraph(RAGState)
     graph.add_node("retrieve", retrieve_node)
@@ -128,21 +135,11 @@ def build_rag_graph(
         route_after_grade,
         {"generate": "generate", "reformulate": "reformulate"},
     )
-    graph.add_edge("reformulate", "retrieve")
+    graph.add_conditional_edges(
+        "reformulate",
+        route_after_reformulate,
+        {"retrieve": "retrieve", "generate": "generate"},
+    )
     graph.add_edge("generate", END)
 
     return graph.compile()
-
-
-def to_messages(history: list[dict[str, str]] | None) -> list[BaseMessage]:
-    """Converte o histórico armazenado em mensagens do LangChain."""
-    if not history:
-        return []
-    converted: list[BaseMessage] = []
-    for item in history:
-        content = item.get("content", "")
-        if item.get("role") == "user":
-            converted.append(HumanMessage(content=content))
-        else:
-            converted.append(AIMessage(content=content))
-    return converted

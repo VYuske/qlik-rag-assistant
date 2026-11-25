@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -10,9 +9,11 @@ from typing import Any, Literal
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessageChunk, BaseMessage
 
-logger = logging.getLogger(__name__)
-
 ANSWER_NODE = "generate"
+
+
+class ChatError(RuntimeError):
+    """Falha ao gerar uma resposta, com mensagem adequada para o usuário final."""
 
 
 @dataclass(frozen=True)
@@ -38,24 +39,20 @@ class ChatService:
         return {
             "messages": list(history or []),
             "question": question,
+            "search_query": question,
             "documents": [],
             "attempts": 0,
             "sufficient": False,
         }
 
-    def stream_answer(
+    def _stream_events(
         self,
-        question: str,
-        history: list[BaseMessage] | None = None,
+        payload: dict[str, Any],
     ) -> Iterator[ChatEvent]:
-        """Emite fontes, tokens e o texto final consolidado."""
-        payload = self._build_payload(question, history)
         tokens: list[str] = []
         documents: list[Document] = []
 
-        for mode, chunk in self._graph.stream(
-            payload, stream_mode=["messages", "custom"]
-        ):
+        for mode, chunk in self._graph.stream(payload, stream_mode=["messages", "custom"]):
             if mode == "custom" and chunk.get("type") == "sources":
                 documents = chunk["documents"]
                 yield ChatEvent(kind="sources", documents=documents)
@@ -73,3 +70,17 @@ class ChatService:
                     yield ChatEvent(kind="token", text=text)
 
         yield ChatEvent(kind="done", text="".join(tokens), documents=documents)
+
+    def stream_answer(
+        self,
+        question: str,
+        history: list[BaseMessage] | None = None,
+    ) -> Iterator[ChatEvent]:
+        """Emite fontes, tokens e o texto final consolidado."""
+        payload = self._build_payload(question, history)
+        try:
+            yield from self._stream_events(payload)
+        except (ConnectionError, OSError) as exc:
+            raise ChatError(
+                "Não foi possível falar com o Ollama. Verifique se ele está rodando."
+            ) from exc

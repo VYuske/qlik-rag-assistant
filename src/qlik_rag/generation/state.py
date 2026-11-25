@@ -10,10 +10,16 @@ from langgraph.graph.message import add_messages
 
 
 class RAGState(TypedDict):
-    """Estado do grafo: histórico, pergunta corrente e trechos recuperados."""
+    """Estado do grafo: histórico, pergunta do usuário, busca e trechos recuperados.
+
+    `question` é a pergunta original e nunca é reescrita: é ela que o usuário vê
+    e que a resposta precisa endereçar. `search_query` é a consulta corrente de
+    busca, que a reformulação atualiza.
+    """
 
     messages: Annotated[list[AnyMessage], add_messages]
     question: str
+    search_query: str
     documents: list[Document]
     attempts: int
     sufficient: bool
