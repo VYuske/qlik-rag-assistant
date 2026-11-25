@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
+
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, HumanMessage
 
@@ -55,3 +57,11 @@ def test_build_history_converts_stored_messages() -> None:
 
 def test_build_history_handles_empty_session() -> None:
     assert build_history([]) == []
+
+
+def test_app_module_imports_without_running_streamlit() -> None:
+    """Garante que `main()` só roda sob __main__, sem executar Streamlit no import."""
+    module = importlib.import_module("qlik_rag.ui.app")
+
+    assert callable(module.main)
+    assert callable(module.get_chat_service)
