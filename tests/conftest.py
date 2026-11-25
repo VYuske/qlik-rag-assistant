@@ -23,6 +23,10 @@ def settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
         "COLLECTION_NAME",
         "DATA_RAW_DIR",
         "PDF_GLOB",
+        "MAX_RETRIEVAL_LOOPS",
+        "LLM_TEMPERATURE",
+        "LLM_NUM_CTX",
+        "STREAMLIT_PORT",
     ):
         monkeypatch.delenv(variable, raising=False)
 
