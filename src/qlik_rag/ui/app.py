@@ -18,7 +18,7 @@ from qlik_rag.ingestion.ingestor import MarkdownIngestor
 from qlik_rag.ingestion.loaders import build_pdf_loader
 from qlik_rag.ingestion.splitters import build_chunk_splitter, build_header_splitter
 from qlik_rag.retrieval.vector_store import VectorStoreService
-from qlik_rag.services.chat_service import ChatService
+from qlik_rag.services.chat_service import ChatError, ChatService
 from qlik_rag.services.ingestion_service import IngestionService
 from qlik_rag.services.search_service import SearchService
 from qlik_rag.ui.formatting import build_history, format_sources
@@ -120,12 +120,18 @@ def main() -> None:
         sources_holder: list = []
         text_placeholder = st.empty()
         collected: list[str] = []
-        for event in get_chat_service().stream_answer(question, history=history):
-            if event.kind == "sources":
-                sources_holder = event.documents
-            elif event.kind == "token":
-                collected.append(event.text)
-                text_placeholder.markdown("".join(collected) + "▌")
+        try:
+            for event in get_chat_service().stream_answer(question, history=history):
+                if event.kind == "sources":
+                    sources_holder = event.documents
+                elif event.kind == "token":
+                    collected.append(event.text)
+                    text_placeholder.markdown("".join(collected) + "▌")
+        except ChatError as exc:
+            text_placeholder.empty()
+            st.error(str(exc))
+            st.session_state["messages"].pop()
+            return
         answer = "".join(collected) or "Não foi possível gerar uma resposta."
         text_placeholder.markdown(answer)
         render_sources(sources_holder)

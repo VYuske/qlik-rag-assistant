@@ -8,7 +8,7 @@ import pytest
 from langchain_core.documents import Document
 
 from qlik_rag.cli import main as cli_main
-from qlik_rag.services.chat_service import ChatEvent
+from qlik_rag.services.chat_service import ChatError, ChatEvent
 from qlik_rag.services.ingestion_service import IngestionReport
 
 
@@ -60,6 +60,21 @@ def test_ask_streams_tokens_and_sources(patched_cli, monkeypatch, capsys) -> Non
     assert exit_code == 0
     assert "Hello world" in captured
     assert "a.pdf" in captured
+
+
+def test_ask_reports_chat_error_without_traceback(patched_cli, monkeypatch, capsys) -> None:
+    class FailingChatService:
+        def stream_answer(self, question, history=None):
+            raise ChatError("Não foi possível falar com o Ollama.")
+
+    monkeypatch.setattr(cli_main, "build_chat_service", lambda settings: FailingChatService())
+
+    exit_code = cli_main.main(["ask", "how?"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Ollama" in captured.err
+    assert "Traceback" not in captured.err
 
 
 def test_stats_prints_chunk_count(patched_cli, capsys) -> None:

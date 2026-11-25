@@ -16,7 +16,7 @@ from qlik_rag.ingestion.loaders import build_pdf_loader
 from qlik_rag.ingestion.splitters import build_chunk_splitter, build_header_splitter
 from qlik_rag.logging_setup import configure_logging
 from qlik_rag.retrieval.vector_store import VectorStoreService
-from qlik_rag.services.chat_service import ChatService
+from qlik_rag.services.chat_service import ChatError, ChatService
 from qlik_rag.services.ingestion_service import IngestionService
 from qlik_rag.services.search_service import SearchService
 
@@ -116,11 +116,15 @@ def build_chat_service(settings: Settings) -> ChatService:
 
 def _run_ask(settings: Settings, text: str) -> int:
     sources: list = []
-    for event in build_chat_service(settings).stream_answer(text):
-        if event.kind == "sources":
-            sources = event.documents
-        elif event.kind == "token":
-            print(event.text, end="", flush=True)
+    try:
+        for event in build_chat_service(settings).stream_answer(text):
+            if event.kind == "sources":
+                sources = event.documents
+            elif event.kind == "token":
+                print(event.text, end="", flush=True)
+    except ChatError as exc:
+        print(f"\nerro: {exc}", file=sys.stderr)
+        return 1
     print()
     if sources:
         print("\nFontes:")

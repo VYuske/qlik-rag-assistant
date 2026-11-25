@@ -5,10 +5,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
+import pytest
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, AIMessageChunk
 
-from qlik_rag.services.chat_service import ChatEvent, ChatService
+from qlik_rag.services.chat_service import ChatError, ChatEvent, ChatService
 
 
 class FakeGraph:
@@ -99,3 +100,17 @@ def test_final_complete_message_is_not_duplicated() -> None:
 
     assert [event.kind for event in events] == ["token", "token", "done"]
     assert events[-1].text == "Hello world"
+
+
+def test_unreachable_model_raises_chat_error() -> None:
+    class ExplodingGraph:
+        def stream(self, payload, **kwargs: object):
+            raise ConnectionError("Failed to connect to Ollama")
+            yield  # pragma: no cover
+
+    service = ChatService(graph=ExplodingGraph())
+
+    with pytest.raises(ChatError) as excinfo:
+        list(service.stream_answer("pergunta"))
+
+    assert "Ollama" in str(excinfo.value)
