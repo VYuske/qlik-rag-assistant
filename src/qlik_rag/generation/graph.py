@@ -97,9 +97,7 @@ def build_rag_graph(
 
     def generate_node(state: RAGState) -> dict[str, object]:
         messages = [
-            message
-            for message in state.get("messages", [])
-            if isinstance(message, BaseMessage)
+            message for message in state.get("messages", []) if isinstance(message, BaseMessage)
         ]
         response = answer_chain.invoke(
             {

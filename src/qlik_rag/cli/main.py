@@ -85,19 +85,14 @@ def _run_ingest(settings: Settings, force: bool) -> int:
         vector_store=VectorStoreService(settings),
     )
     report = service.ensure_indexed(force=force)
-    print(
-        json.dumps(
-            {"indexed_chunks": report.indexed_chunks, "skipped": report.skipped}
-        )
-    )
+    print(json.dumps({"indexed_chunks": report.indexed_chunks, "skipped": report.skipped}))
     return 0
 
 
 def _run_query(settings: Settings, text: str, k: int | None) -> int:
     documents = SearchService(VectorStoreService(settings)).search(text, k=k)
     payload = [
-        {"content": document.page_content, "metadata": document.metadata}
-        for document in documents
+        {"content": document.page_content, "metadata": document.metadata} for document in documents
     ]
     print(json.dumps({"query": text, "results": payload}, ensure_ascii=False, indent=2))
     return 0

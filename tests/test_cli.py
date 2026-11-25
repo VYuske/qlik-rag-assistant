@@ -45,9 +45,10 @@ def patched_cli(monkeypatch):
 def test_ask_streams_tokens_and_sources(patched_cli, monkeypatch, capsys) -> None:
     class StubChatService:
         def stream_answer(self, question, history=None):
-            yield ChatEvent(kind="sources", documents=[
-                Document(page_content="x", metadata={"source": "a.pdf", "page": 2})
-            ])
+            yield ChatEvent(
+                kind="sources",
+                documents=[Document(page_content="x", metadata={"source": "a.pdf", "page": 2})],
+            )
             yield ChatEvent(kind="token", text="Hello ")
             yield ChatEvent(kind="token", text="world")
             yield ChatEvent(kind="done", text="Hello world")

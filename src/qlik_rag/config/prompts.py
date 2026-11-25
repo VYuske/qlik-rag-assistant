@@ -13,7 +13,7 @@ SYSTEM_PROMPT: str = "\n".join(
         "* Never guess or invent Qlik functionality.",
         "* Generate code only when supported by retrieved sources.",
         "* Cite the sources used.",
-        '* If the answer is not in the documentation, say: "I don\'t have enough'
+        "* If the answer is not in the documentation, say: \"I don't have enough"
         ' information in the available documentation to answer this question."',
         "* Verify that every technical statement and code example is supported by"
         " retrieved documentation before responding.",

@@ -25,11 +25,7 @@ def format_sources(documents: list[Document]) -> list[dict[str, Any]]:
     """Normaliza os trechos recuperados para exibição."""
     entries: list[dict[str, Any]] = []
     for document in documents:
-        headers = [
-            str(document.metadata[key])
-            for key in HEADER_KEYS
-            if document.metadata.get(key)
-        ]
+        headers = [str(document.metadata[key]) for key in HEADER_KEYS if document.metadata.get(key)]
         entries.append(
             {
                 "label": source_label(document),
