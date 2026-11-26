@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/VYuske/qlik-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/VYuske/qlik-rag-assistant/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Ruff](https://img.shields.io/badge/lint-ruff-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
 [![pytest](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)](tests/)
 
@@ -28,7 +28,7 @@ O pipeline transforma PDFs em markdown, divide em chunks, gera embeddings com Ol
 
 ## Requisitos
 
-- Python 3.12+ (CI cobre 3.12 e 3.13)
+- Python 3.12
 - [Conda](https://docs.conda.io/) (recomendado)
 - [Ollama](https://ollama.com/) rodando localmente
 - Java (JRE) — exigido pelo `OpenDataLoaderPDFLoader`
@@ -148,7 +148,7 @@ Os testes usam `FakeEmbeddings`, LLM falso e `tmp_path`, portanto não exigem re
 
 ### Integração contínua
 
-O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda em cada push e pull request para `main`, com matrix Python 3.12 e 3.13:
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda em cada push e pull request para `main`, em Python 3.12:
 
 1. `ruff check` — lint
 2. `ruff format --check` — formatação
